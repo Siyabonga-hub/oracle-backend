@@ -267,6 +267,105 @@ def polymarket_weather():
     except Exception as e:
         return jsonify({"error": str(e), "markets": [], "count": 0}), 500
 
+# ── NEWS SEARCH (DuckDuckGo — no API key needed) ─────────────────────────────
+@app.route("/news/search", methods=["GET","OPTIONS"])
+def news_search():
+    if request.method == "OPTIONS":
+        return Response(status=200)
+    try:
+        query = request.args.get("q", "Trump speech news today")
+
+        articles = []
+
+        # Strategy 1: DuckDuckGo instant answer
+        try:
+            r = requests.get(
+                "https://api.duckduckgo.com/",
+                params={"q": query, "format": "json", "no_html": "1", "skip_disambig": "1"},
+                headers={"User-Agent": "Mozilla/5.0"},
+                timeout=10
+            )
+            data = r.json()
+            abstract = data.get("AbstractText", "")
+            if abstract:
+                articles.append({
+                    "title": abstract[:150],
+                    "source": data.get("AbstractSource", "DuckDuckGo"),
+                    "url": data.get("AbstractURL", ""),
+                    "relevance": "HIGH"
+                })
+            for topic in data.get("RelatedTopics", [])[:12]:
+                if isinstance(topic, dict) and topic.get("Text"):
+                    articles.append({
+                        "title": topic["Text"][:120],
+                        "source": topic.get("FirstURL","").split("/")[2] if topic.get("FirstURL") else "DDG",
+                        "url": topic.get("FirstURL",""),
+                        "relevance": "MEDIUM"
+                    })
+                elif isinstance(topic, dict) and topic.get("Topics"):
+                    for sub in topic["Topics"][:4]:
+                        if sub.get("Text"):
+                            articles.append({
+                                "title": sub["Text"][:120],
+                                "source": sub.get("FirstURL","").split("/")[2] if sub.get("FirstURL") else "DDG",
+                                "url": sub.get("FirstURL",""),
+                                "relevance": "MEDIUM"
+                            })
+        except Exception:
+            pass
+
+        # Strategy 2: GNews free endpoint (no key, limited)
+        try:
+            r2 = requests.get(
+                "https://gnews.io/api/v4/search",
+                params={"q": query, "lang": "en", "max": 5, "token": "free"},
+                headers={"User-Agent": "Mozilla/5.0"},
+                timeout=8
+            )
+            for item in r2.json().get("articles", [])[:5]:
+                articles.append({
+                    "title": item.get("title","")[:120],
+                    "source": item.get("source",{}).get("name","GNews"),
+                    "url": item.get("url",""),
+                    "relevance": "HIGH"
+                })
+        except Exception:
+            pass
+
+        # Strategy 3: RSS feeds — completely free, no auth needed
+        rss_feeds = [
+            "https://feeds.bbci.co.uk/news/world/us_and_canada/rss.xml",
+            "https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml",
+        ]
+        for feed_url in rss_feeds:
+            try:
+                r3 = requests.get(feed_url, headers={"User-Agent":"Mozilla/5.0"}, timeout=6)
+                # Simple XML parse for titles
+                import re
+                titles = re.findall(r'<title><!\[CDATA\[(.*?)\]\]></title>', r3.text)
+                if not titles:
+                    titles = re.findall(r'<title>(.*?)</title>', r3.text)
+                source = "BBC" if "bbc" in feed_url else "NYT"
+                for title in titles[1:8]:  # skip first (feed title)
+                    clean = title.replace("&amp;","&").replace("&quot;",'"').strip()
+                    if len(clean) > 10:
+                        articles.append({"title":clean[:120],"source":source,"url":"","relevance":"MEDIUM"})
+            except Exception:
+                pass
+
+        # Deduplicate and trim
+        seen, unique = set(), []
+        for a in articles:
+            key = a["title"][:40]
+            if key not in seen:
+                seen.add(key)
+                unique.append(a)
+
+        return jsonify({"articles": unique[:15], "query": query, "count": len(unique), "status": "ok"})
+
+    except Exception as e:
+        return jsonify({"error": str(e), "articles": [], "status": "error"}), 500
+
 @app.route("/weather/forecast", methods=["GET", "OPTIONS"])
 def weather_forecast():
     if request.method == "OPTIONS":
@@ -309,3 +408,4 @@ def weather_forecast():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+    
