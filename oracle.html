@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ORACLE — FVG Engine</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:       #090b0f;
+    --panel:    #0e1117;
+    --border:   #1c2230;
+    --gold:     #c8a84b;
+    --green:    #3ddc84;
+    --red:      #ff5f5f;
+    --neutral:  #7a8499;
+    --text:     #dce3f0;
+    --dim:      #4a5268;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* GRID BACKGROUND */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(200,168,75,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(200,168,75,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrapper {
+    position: relative;
+    z-index: 1;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 24px 16px;
+  }
+
+  /* HEADER */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 28px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo {
+    font-family: 'Syne', sans-serif;
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: 0.15em;
+    color: var(--gold);
+  }
+
+  .logo span {
+    color: var(--dim);
+    font-weight: 400;
+    font-size: 12px;
+    display: block;
+    letter-spacing: 0.2em;
+    margin-top: 2px;
+  }
+
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.4; }
+  }
+
+  /* CONTROLS */
+  .controls {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+
+  select, button {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    padding: 10px 16px;
+    cursor: pointer;
+    transition: all 0.15s;
+    border-radius: 2px;
+    outline: none;
+  }
+
+  select:hover, button:hover {
+    border-color: var(--gold);
+    color: var(--gold);
+  }
+
+  button.primary {
+    background: var(--gold);
+    color: var(--bg);
+    border-color: var(--gold);
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    flex: 1;
+  }
+
+  button.primary:hover {
+    background: #e0be6a;
+    color: var(--bg);
+  }
+
+  button.primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* BIAS BANNER */
+  .bias-banner {
+    padding: 14px 18px;
+    border-left: 3px solid var(--dim);
+    background: var(--panel);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-radius: 0 2px 2px 0;
+    transition: border-color 0.3s;
+  }
+
+  .bias-banner.BULLISH { border-color: var(--green); }
+  .bias-banner.BEARISH { border-color: var(--red); }
+  .bias-banner.NEUTRAL { border-color: var(--gold); }
+
+  .bias-label {
+    font-family: 'Syne', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+  }
+
+  .bias-label.BULLISH { color: var(--green); }
+  .bias-label.BEARISH { color: var(--red); }
+  .bias-label.NEUTRAL { color: var(--gold); }
+
+  .bias-reason {
+    color: var(--neutral);
+    font-size: 11px;
+    margin-top: 3px;
+  }
+
+  .price-display {
+    text-align: right;
+    font-size: 20px;
+    color: var(--gold);
+    font-weight: 700;
+  }
+
+  .price-display span {
+    display: block;
+    font-size: 10px;
+    color: var(--dim);
+    letter-spacing: 0.15em;
+    margin-bottom: 2px;
+  }
+
+  /* GRID */
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  @media (max-width: 560px) {
+    .grid { grid-template-columns: 1fr; }
+  }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    padding: 16px;
+    border-radius: 2px;
+  }
+
+  .panel-title {
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--dim);
+    margin-bottom: 12px;
+    text-transform: uppercase;
+  }
+
+  /* FVG LIST */
+  .fvg-item {
+    padding: 10px 12px;
+    border-left: 2px solid var(--dim);
+    margin-bottom: 8px;
+    background: rgba(255,255,255,0.02);
+  }
+
+  .fvg-item.bullish { border-color: var(--green); }
+  .fvg-item.bearish { border-color: var(--red); }
+
+  .fvg-type {
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+
+  .fvg-type.bullish { color: var(--green); }
+  .fvg-type.bearish { color: var(--red); }
+
+  .fvg-row {
+    display: flex;
+    justify-content: space-between;
+    color: var(--neutral);
+    font-size: 11px;
+    margin-top: 2px;
+  }
+
+  .fvg-row strong { color: var(--text); }
+
+  /* KELLY PANEL */
+  .kelly-value {
+    font-family: 'Syne', sans-serif;
+    font-size: 36px;
+    font-weight: 800;
+    color: var(--gold);
+    line-height: 1;
+  }
+
+  .kelly-value span {
+    font-size: 16px;
+    color: var(--dim);
+  }
+
+  .kelly-note {
+    color: var(--neutral);
+    font-size: 11px;
+    margin-top: 8px;
+    line-height: 1.6;
+  }
+
+  /* ANALYSIS PANEL */
+  .analysis-panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    padding: 20px;
+    margin-bottom: 16px;
+    border-radius: 2px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .analysis-panel::before {
+    content: 'ORACLE';
+    position: absolute;
+    top: 12px;
+    right: 16px;
+    font-size: 9px;
+    letter-spacing: 0.3em;
+    color: var(--border);
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+  }
+
+  .analysis-text {
+    color: var(--text);
+    line-height: 1.8;
+    font-size: 12px;
+    white-space: pre-wrap;
+    min-height: 60px;
+  }
+
+  .no-setup {
+    color: var(--red);
+    font-weight: 700;
+    font-size: 13px;
+  }
+
+  /* CANDLE CHART */
+  .chart-container {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    padding: 16px;
+    margin-bottom: 16px;
+    border-radius: 2px;
+  }
+
+  canvas#chart {
+    width: 100% !important;
+    height: 180px !important;
+  }
+
+  /* LOADING */
+  .loading {
+    display: none;
+    text-align: center;
+    padding: 30px;
+    color: var(--dim);
+    letter-spacing: 0.2em;
+    font-size: 11px;
+  }
+
+  .loading.active { display: block; }
+
+  .spinner {
+    display: inline-block;
+    width: 16px; height: 16px;
+    border: 2px solid var(--border);
+    border-top-color: var(--gold);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-right: 8px;
+    vertical-align: middle;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* EMPTY STATE */
+  .empty {
+    color: var(--dim);
+    font-size: 11px;
+    padding: 8px 0;
+  }
+
+  /* FOOTER */
+  footer {
+    margin-top: 32px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    color: var(--dim);
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* FADE IN */
+  .fade-in {
+    animation: fadeIn 0.4s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+  <header>
+    <div class="logo">
+      ORACLE
+      <span>FVG · ICT ENGINE · v3.0</span>
+    </div>
+    <div class="status-dot" id="dot"></div>
+  </header>
+
+  <!-- CONTROLS -->
+  <div class="controls">
+    <select id="symbolSelect">
+      <option value="NQ=F">NAS100</option>
+      <option value="GC=F">XAUUSD</option>
+      <option value="ES=F">S&P500</option>
+      <option value="YM=F">US30</option>
+    </select>
+    <button class="primary" id="analyzeBtn" onclick="runAnalysis()">
+      ▶ ANALYZE
+    </button>
+  </div>
+
+  <!-- LOADING -->
+  <div class="loading" id="loading">
+    <span class="spinner"></span> SCANNING MARKET STRUCTURE...
+  </div>
+
+  <!-- MAIN CONTENT -->
+  <div id="main" style="display:none">
+
+    <!-- BIAS BANNER -->
+    <div class="bias-banner" id="biasBanner">
+      <div>
+        <div class="bias-label" id="biasLabel">—</div>
+        <div class="bias-reason" id="biasReason">—</div>
+      </div>
+      <div class="price-display">
+        <span>PRICE</span>
+        <span id="priceDisplay">—</span>
+      </div>
+    </div>
+
+    <!-- CHART -->
+    <div class="chart-container">
+      <div class="panel-title">5M PRICE STRUCTURE</div>
+      <canvas id="chart"></canvas>
+    </div>
+
+    <!-- FVG + KELLY GRID -->
+    <div class="grid">
+      <div class="panel">
+        <div class="panel-title">UNFILLED FVGS — 5M</div>
+        <div id="fvgList"><div class="empty">No FVGs detected</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">KELLY POSITION SIZE</div>
+        <div class="kelly-value" id="kellyVal">—<span>%</span></div>
+        <div class="kelly-note" id="kellyNote">
+          Half-Kelly sizing. Apply to your account balance per trade.
+        </div>
+      </div>
+    </div>
+
+    <!-- ORACLE ANALYSIS -->
+    <div class="analysis-panel">
+      <div class="panel-title">ORACLE ANALYSIS</div>
+      <div class="analysis-text" id="analysisText">Awaiting scan...</div>
+    </div>
+
+  </div>
+
+</div>
+
+<!-- FOOTER -->
+<div class="wrapper" style="padding-top:0">
+  <footer>
+    <span>ORACLE · ICT METHODOLOGY · FVG ENGINE</span>
+    <span id="lastUpdate">—</span>
+  </footer>
+</div>
+
+<script>
+// ─── CONFIG ─────────────────────────────────────────────────────────────────
+// Change this to your deployed Render backend URL
+const BACKEND = "https://YOUR-ORACLE-BACKEND.onrender.com";
+
+let chartInstance = null;
+
+// ─── MAIN ────────────────────────────────────────────────────────────────────
+async function runAnalysis() {
+  const btn    = document.getElementById("analyzeBtn");
+  const load   = document.getElementById("loading");
+  const main   = document.getElementById("main");
+  const symbol = document.getElementById("symbolSelect").value;
+
+  btn.disabled = true;
+  load.classList.add("active");
+  main.style.display = "none";
+
+  try {
+    const res  = await fetch(`${BACKEND}/analyze`, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ symbol }),
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    renderDashboard(data);
+    main.style.display = "block";
+    main.classList.add("fade-in");
+
+  } catch (err) {
+    alert("Error: " + err.message);
+  } finally {
+    btn.disabled = false;
+    load.classList.remove("active");
+  }
+}
+
+// ─── RENDER ──────────────────────────────────────────────────────────────────
+function renderDashboard(data) {
+  const { htf_bias, fvgs, kelly_pct, analysis, candles, current_price } = data;
+
+  // Bias banner
+  const banner = document.getElementById("biasBanner");
+  banner.className = `bias-banner ${htf_bias.bias}`;
+  const lbl = document.getElementById("biasLabel");
+  lbl.textContent = htf_bias.bias;
+  lbl.className   = `bias-label ${htf_bias.bias}`;
+  document.getElementById("biasReason").textContent   = htf_bias.reason;
+  document.getElementById("priceDisplay").textContent = formatPrice(current_price);
+
+  // FVGs
+  const fvgList = document.getElementById("fvgList");
+  if (!fvgs || fvgs.length === 0) {
+    fvgList.innerHTML = '<div class="empty">No unfilled FVGs on 5M</div>';
+  } else {
+    fvgList.innerHTML = fvgs.map(f => `
+      <div class="fvg-item ${f.type}">
+        <div class="fvg-type ${f.type}">${f.type.toUpperCase()} FVG</div>
+        <div class="fvg-row"><span>Top</span><strong>${formatPrice(f.top)}</strong></div>
+        <div class="fvg-row"><span>Bottom</span><strong>${formatPrice(f.bottom)}</strong></div>
+        <div class="fvg-row"><span>Entry (mid)</span><strong>${formatPrice(f.midpoint)}</strong></div>
+      </div>
+    `).join("");
+  }
+
+  // Kelly
+  document.getElementById("kellyVal").innerHTML = `${kelly_pct}<span>%</span>`;
+
+  // Analysis
+  const analysisEl = document.getElementById("analysisText");
+  const noSetup    = analysis.includes("NO SETUP");
+  analysisEl.className = `analysis-text ${noSetup ? "no-setup" : ""}`;
+  analysisEl.textContent = analysis;
+
+  // Chart
+  renderChart(candles, fvgs);
+
+  // Timestamp
+  document.getElementById("lastUpdate").textContent =
+    "UPDATED " + new Date().toLocaleTimeString();
+}
+
+// ─── CHART ───────────────────────────────────────────────────────────────────
+function renderChart(candles, fvgs) {
+  if (chartInstance) { chartInstance.destroy(); }
+
+  const ctx    = document.getElementById("chart").getContext("2d");
+  const labels = candles.map((_, i) => i);
+  const closes = candles.map(c => c.close);
+  const opens  = candles.map(c => c.open);
+
+  // Build FVG zone annotations
+  const annotations = {};
+  (fvgs || []).forEach((f, i) => {
+    annotations[`fvg${i}`] = {
+      type:        "box",
+      yMin:        f.bottom,
+      yMax:        f.top,
+      backgroundColor: f.type === "bullish"
+        ? "rgba(61,220,132,0.08)"
+        : "rgba(255,95,95,0.08)",
+      borderColor: f.type === "bullish"
+        ? "rgba(61,220,132,0.4)"
+        : "rgba(255,95,95,0.4)",
+      borderWidth: 1,
+    };
+  });
+
+  chartInstance = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [{
+        data:         closes,
+        borderColor:  "#c8a84b",
+        borderWidth:  1.5,
+        pointRadius:  0,
+        tension:      0.1,
+        fill:         false,
+      }],
+    },
+    options: {
+      responsive:          true,
+      maintainAspectRatio: false,
+      animation:           { duration: 400 },
+      plugins: {
+        legend:  { display: false },
+        tooltip: { enabled: false },
+        annotation: { annotations },
+      },
+      scales: {
+        x: {
+          display: false,
+        },
+        y: {
+          position:  "right",
+          grid:      { color: "rgba(255,255,255,0.03)" },
+          ticks:     {
+            color: "#4a5268",
+            font:  { family: "Space Mono", size: 10 },
+            maxTicksLimit: 6,
+          },
+        },
+      },
+    },
+    plugins: [annotationPlugin()],
+  });
+}
+
+// Inline annotation plugin (no CDN dependency)
+function annotationPlugin() {
+  return {
+    id: "fvgZones",
+    beforeDraw(chart) {
+      const { ctx, scales, data } = chart;
+      if (!chart.config._config.plugins?.annotation?.annotations) return;
+      const anns = chart.config._config.plugins.annotation.annotations;
+      const yScale = scales.y;
+      const xLeft  = chart.chartArea.left;
+      const xRight = chart.chartArea.right;
+
+      Object.values(anns).forEach(ann => {
+        if (ann.type !== "box") return;
+        const yTop    = yScale.getPixelForValue(ann.yMax);
+        const yBottom = yScale.getPixelForValue(ann.yMin);
+        ctx.save();
+        ctx.fillStyle   = ann.backgroundColor;
+        ctx.strokeStyle = ann.borderColor;
+        ctx.lineWidth   = ann.borderWidth;
+        ctx.fillRect(xLeft, yTop, xRight - xLeft, yBottom - yTop);
+        ctx.strokeRect(xLeft, yTop, xRight - xLeft, yBottom - yTop);
+        ctx.restore();
+      });
+    }
+  };
+}
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+function formatPrice(p) {
+  if (!p) return "—";
+  return p > 1000
+    ? p.toLocaleString("en-US", { maximumFractionDigits: 2 })
+    : p.toFixed(4);
+}
+</script>
+
+<!-- Chart.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+
+</body>
+</html>
